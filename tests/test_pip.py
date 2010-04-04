@@ -115,4 +115,3 @@ def diff_states(start, end, ignore=None):
 if __name__ == '__main__':
     sys.stderr.write("Run pip's tests using nosetests. Requires virtualenv, ScriptTest, and nose.\n")
     sys.exit(1)
-

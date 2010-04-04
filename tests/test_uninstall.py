@@ -118,4 +118,3 @@ def test_uninstall_from_reqs_file():
     result2 = run_pip('uninstall', '-r', 'test-req.txt', '-y')
     diff = diff_states(result.files_before, result2.files_after, ignore=['build', 'src']).values()
     assert diff == [{}, {}, {}], diff
-
