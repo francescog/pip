@@ -48,7 +48,7 @@ class Logger(object):
         args = args or kw
         rendered = None
         for consumer_level, consumer in self.consumers:
-            if self.level_matches(level, consumer_level):
+            if True or self.level_matches(level, consumer_level):
                 if (self.in_progress_hanging
                     and consumer in (sys.stdout, sys.stderr)):
                     self.in_progress_hanging = False

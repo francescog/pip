@@ -21,10 +21,10 @@ from pip.util import display_path, rmtree, format_size
 from pip.util import splitext, ask, backup_dir
 from pip.util import url_to_filename, filename_to_url
 from pip.util import is_url, is_filename, is_local, dist_is_local
-from pip.util import renames, normalize_path, egg_link_path
+from pip.util import normalize_path, egg_link_path
 from pip.util import make_path_relative, is_svn_page, file_contents
 from pip.util import has_leading_dir, split_leading_dir
-from pip.util import get_file_content
+from pip.util import renames, get_file_content
 from pip.util import in_venv
 from pip import call_subprocess
 from pip.backwardcompat import any, md5
@@ -1434,7 +1434,7 @@ class UninstallPathSet(object):
         ``auto_confirm`` is True)."""
         if not self._can_uninstall():
             return
-        logger.notify('Uninstalling %s:' % self.dist.project_name)
+        logger.notify('Uninstalling %s!:' % self.dist.project_name)
         logger.indent += 2
         paths = sorted(self.compact(self.paths))
         try:
@@ -1451,11 +1451,16 @@ class UninstallPathSet(object):
             if response == 'y':
                 self.save_dir = tempfile.mkdtemp(suffix='-uninstall',
                                                  prefix='pip-')
+                logger.notify('save_dir: %s'%self.save_dir)
                 for path in paths:
                     new_path = os.path.splitdrive(path)[1].lstrip(os.path.sep)
+                    logger.notify('relative: %s'%new_path)
                     new_path = os.path.join(self.save_dir, new_path)
+                    logger.notify('absolute: %s'%new_path)
                     logger.info('Removing file or directory %s' % path)
                     self._moved_paths.append(path)
+                    if not os.path.exists(os.path.dirname(new_path)):
+                        os.makedirs(os.path.dirname(new_path))
                     renames(path, new_path)
                 for pth in self.pth.values():
                     pth.remove()

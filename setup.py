@@ -32,7 +32,7 @@ else:
 # Allows reset_env in test_pip.py to invoke setup.py from outside the
 # directory where it's located, which is needed to prepare a proper
 # virtual environment from without performing unnatural contortions.
-os.chdir(os.path.dirname(__file__))
+os.chdir(os.path.dirname(os.path.join(os.path.curdir,__file__)))
 
 setup(name='pip',
       version=version,

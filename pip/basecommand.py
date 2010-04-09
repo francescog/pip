@@ -132,7 +132,7 @@ class Command(object):
             log_fn = options.log_file
             text = '\n'.join(complete_log)
             logger.fatal('Storing complete log in %s' % log_fn)
-            log_fp = open_logfile(log_fn, 'w')
+            log_fp = open_logfile(log_fn, 'a')
             log_fp.write(text)
             log_fp.close()
         return exit
@@ -185,6 +185,11 @@ def open_logfile(filename, mode='a'):
     """
     filename = os.path.expanduser(filename)
     exists = os.path.exists(filename)
+    
+    dir = os.path.dirname(filename)
+    if dir and not os.path.exists(dir):
+        os.makedirs(dir)
+        
     log_fp = open(filename, mode)
     if exists:
         print >> log_fp, '-'*60
