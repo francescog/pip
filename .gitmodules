@@ -1,0 +1,3 @@
+[submodule "scripttest"]
+	path = scripttest
+	url = git@github.com:ryppl/scripttest.git
