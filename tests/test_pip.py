@@ -29,6 +29,22 @@ def clear_environ(environ):
     return dict(((k, v) for k, v in environ.iteritems()
                 if not k.lower().startswith('pip_')))
 
+def install_setuptools(env):
+    easy_install = os.path.join(env.bin_dir, 'easy_install')
+    version = 'setuptools==0.6c11'
+    if sys.platform != 'win32':
+        return env.run(easy_install, version)
+    
+    import tempfile, shutil
+    tempdir = tempfile.mkdtemp()
+    try:
+        shutil.copy2(easy_install+'.exe', tempdir)
+        shutil.copy2(easy_install+'-script.py', tempdir)
+        return env.run(os.path.join(tempdir, 'easy_install'), version)
+    finally:
+        shutil.rmtree(tempdir)
+            
+    
 env = None
 def reset_env(environ=None):
     global env
@@ -39,18 +55,23 @@ def reset_env(environ=None):
     environ['PIP_NO_INPUT'] = '1'
     environ['PIP_LOG_FILE'] = './pip-log.txt'
     environ['PYTHONPATH'] = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
-    env = TestFileEnvironment(base_path, ignore_hidden=False, environ=environ)
+    env = TestFileEnvironment(base_path, ignore_hidden=False, environ=environ, split_cmd=False)
     env.run(sys.executable, '-m', 'virtualenv', '--no-site-packages', env.base_path)
+    where = env.run(sys.executable, '-c', 
+                    'import virtualenv;'
+                    'virtualenv.logger = virtualenv.Logger([]);'
+                    'print repr(virtualenv.path_locations(%r))'%env.base_path)
+    env.home_dir, env.lib_dir, env.inc_dir, env.bin_dir = eval(where.stdout.strip())
     # make sure we have current setuptools to avoid svn incompatibilities
-    env.run('%s/bin/easy_install' % env.base_path, 'setuptools==0.6c11')
+    install_setuptools(env)
 
     # Uninstall whatever version of pip might have been there
-    env.run('%s/bin/pip' % env.base_path, 'uninstall', '-y', 'pip')
+    # env.run(os.path.join(env.bin_dir, 'pip'), 'uninstall', '-y', 'pip')
 
     # Install this version on top of it
-    env.run('python', os.path.join(here,os.pardir,'setup.py'), 'install')
+    env.run(os.path.join(env.bin_dir, 'python'), os.path.join(here,os.pardir,'setup.py'), 'install')
 
-    env.run('mkdir', 'src')
+    env.run(sys.executable, '-c', 'import os;os.mkdir("src")')
 
 def run_pip(*args, **kw):
     args = (sys.executable, '-c', 'import pip; pip.main()', '-E', env.base_path) + args
