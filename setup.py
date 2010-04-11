@@ -32,7 +32,7 @@ else:
 # Allows reset_env in test_pip.py to invoke setup.py from outside the
 # directory where it's located, which is needed to prepare a proper
 # virtual environment from without performing unnatural contortions.
-os.chdir(os.path.dirname(__file__))
+os.chdir(os.path.dirname(os.path.join('.',__file__)))
 
 setup(name='pip',
       version=version,
@@ -50,6 +50,7 @@ setup(name='pip',
       author_email='python-virtualenv@groups.google.com',
       url='http://pip.openplans.org',
       license='MIT',
-      packages=['pip', 'pip.commands', 'pip.vcs'],
+      packages=['pip', 'pip.commands', 'pip.vcs', 'scripttest'],
+      package_dir={ 'scripttest':os.path.join('scripttest', 'scripttest') },
       **kw)
       
