@@ -18,6 +18,11 @@ def test_correct_pip_version():
     # compare the directory tree of the invoked pip with that of this source distribution
     import re,filecmp
     dir = re.match(r'\s*pip\s\S+\sfrom\s+(.*)\s\([^(]+\)$', result.stdout.replace('\r\n','\n')).group(1)
+
+    import sys
+    args = (sys.executable, '-c', 'import pip; print "pip module at:", pip.__file__', '-E', env.base_path) + args
+    env.run(*args, **kw)
+
     diffs = filecmp.dircmp(join(base,'pip'), join(dir,'pip'))
 
     # If any non-matching .py files exist, we have a problem: run_pip
