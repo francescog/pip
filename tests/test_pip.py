@@ -67,7 +67,9 @@ def reset_env(environ=None):
 
     # Uninstall whatever version of pip might have been there.  We do
     # it this way because on Windows pip can't delete itself while executing.
-    env.run(sys.executable, '-c', 'import pip;pip.main()', 'uninstall', '-y', 'pip')
+#    env.run(sys.executable, '-c', 'import pip;pip.main()', 'uninstall', '-y', 'pip')
+    # Uninstall (kind of) pip, so PYTHONPATH can take effect:
+    env.run('%s/bin/easy_install' % env.base_path, '-m', 'pip')
 
     # Install this version on top of it
     env.run(os.path.join(env.bin_dir, 'python'), os.path.join(here,os.pardir,'setup.py'), 'install')
