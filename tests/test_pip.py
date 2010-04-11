@@ -65,8 +65,9 @@ def reset_env(environ=None):
     # make sure we have current setuptools to avoid svn incompatibilities
     install_setuptools(env)
 
-    # Uninstall whatever version of pip might have been there
-    # env.run(os.path.join(env.bin_dir, 'pip'), 'uninstall', '-y', 'pip')
+    # Uninstall whatever version of pip might have been there.  We do
+    # it this way because on Windows pip can't delete itself while executing.
+    env.run(sys.executable, '-c', 'import pip;pip.main()', 'uninstall', '-y', 'pip')
 
     # Install this version on top of it
     env.run(os.path.join(env.bin_dir, 'python'), os.path.join(here,os.pardir,'setup.py'), 'install')
