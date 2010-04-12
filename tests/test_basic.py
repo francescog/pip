@@ -75,11 +75,11 @@ def test_install_editable_from_svn():
     result = run_pip('install', '-e', 'svn+http://svn.colorstudy.com/INITools/trunk#egg=initools-dev', expect_error=True)
     egg_link = result.files_created[e.site_packages / 'INITools.egg-link']
     # FIXME: I don't understand why there's a trailing . here:
-    assert egg_link.bytes.endswith('/test-scratch/src/initools\n.'), egg_link.bytes
+    assert egg_link.bytes.endswith('.'), egg_link.bytes
+    assert egg_link.bytes[:-1].strip().endswith(e.env_path / 'src' / 'initools'), egg_link.bytes
     assert (e.site_packages / 'easy-install.pth') in result.files_updated
-    assert 'src/initools' in result.files_created
-    assert 'src/initools/.svn' in result.files_created
-
+    assert e.relative_env_path/'src'/'initools' in result.files_created, result.files_created
+    assert e.relative_env_path/'src'/'initools'/'.svn' in result.files_created, result.files_created
 
 def test_install_dev_version_from_pypi():
     """

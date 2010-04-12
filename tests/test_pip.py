@@ -57,22 +57,23 @@ class TestPipEnvironment(TestFileEnvironment):
         self.root_path = Path(tempfile.mkdtemp('piptest-'))
 
         # We will set up a virtual environment at root_path.  
-        scratch_path = self.root_path / 'scratch'
+        self.scratch_path = self.root_path / 'scratch'
         download_cache = self.root_path / 'cache'
 
         # where we'll create the virtualenv for testing
-        env_path = os.path.join(self.root_path, 'env')
+        self.relative_env_path = Path('env')
+        self.env_path = self.root_path / self.relative_env_path
 
         # Where we'll put the setuptools and virtualenv packages (if necessary)
         aux_pkg_path = os.path.join(self.root_path, 'pkgs')
         sys.path.insert(0, aux_pkg_path)
 
-        for d in (download_cache, aux_pkg_path, env_path, scratch_path):
+        for d in (download_cache, aux_pkg_path, self.env_path, self.scratch_path):
             if not os.path.exists(d): 
                 os.makedirs(d)
 
         self.site_packages = Path(
-            'test-env','lib', 'python'+pyversion, 'site-packages'
+            'env','lib', 'python'+pyversion, 'site-packages'
             )
 
         # current environment, but wihtout all "PIP_" environment
@@ -116,7 +117,7 @@ class TestPipEnvironment(TestFileEnvironment):
         install_requirement('virtualenv', aux_pkg_path)
         
         # create the testing environment
-        create_virtualenv(env_path)
+        create_virtualenv(self.env_path)
 
         # Run everything else in that environment.  Setting PATH is
         # the only significant thing done by virtualenv's activate
@@ -124,12 +125,12 @@ class TestPipEnvironment(TestFileEnvironment):
         #
         # TODO: this is a maintenance hazard.  How can we keep it in 
         # sync with bin/activate?
-        bin = os.path.join(env_path,'bin')
+        bin = os.path.join(self.env_path,'bin')
         environ['PATH'] = os.path.pathsep.join((bin, environ['PATH']))
 
         super(TestPipEnvironment, self).__init__(
             self.root_path, ignore_hidden=False, environ=environ, split_cmd=False, 
-            start_clear=False, cwd=scratch_path)
+            start_clear=False, cwd=self.scratch_path)
 
         # Now install ourselves there
         self.run('python', 'setup.py', 'install', cwd=os.path.join(here,os.pardir))
