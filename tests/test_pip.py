@@ -76,7 +76,7 @@ class TestPipEnvironment(TestFileEnvironment):
             'env','lib', 'python'+pyversion, 'site-packages'
             )
 
-        # current environment, but wihtout all "PIP_" environment
+        # current environment, but without all "PIP_" environment
         # variables...
         environ = dict( ((k, v) for k, v in os.environ.iteritems()
                          if not k.lower().startswith('pip_') 
