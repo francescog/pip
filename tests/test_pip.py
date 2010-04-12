@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 import os, sys, tempfile, shutil
+from path import Path
 
 pyversion = sys.version[:3]
-lib_py = 'lib/python%s/' % pyversion
 here = os.path.dirname(os.path.abspath(__file__))
 
 sys.path.insert(
@@ -70,6 +70,10 @@ class TestPipEnvironment(TestFileEnvironment):
         for d in (download_cache, aux_pkg_path, env_path, scratch_path):
             if not os.path.exists(d): 
                 os.makedirs(d)
+
+        self.site_packages = Path(
+            'test-env','lib', 'python'+pyversion, 'site-packages'
+            )
 
         # current environment, but wihtout all "PIP_" environment
         # variables...
@@ -148,9 +152,8 @@ except NameError:
 env = None
 def reset_env():
     global env
-
-    import tempfile
     env = TestPipEnvironment()
+    return env
 
 def run_pip(*args, **kw):
     # args = (sys.executable, '-c', 'import pip; pip.main()', '-E', env.base_path) + args
