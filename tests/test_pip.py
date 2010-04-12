@@ -54,17 +54,17 @@ def create_virtualenv(where):
 class TestPipEnvironment(TestFileEnvironment):
 
     def __init__(self):
-        self.root_path = tempfile.mkdtemp()
+        self.root_path = Path(tempfile.mkdtemp('piptest-'))
 
         # We will set up a virtual environment at root_path.  
-        scratch_path = os.path.join(self.root_path,'test-scratch')
-        download_cache = os.path.join(self.root_path, 'test-cache')
+        scratch_path = self.root_path / 'scratch'
+        download_cache = self.root_path / 'cache'
 
         # where we'll create the virtualenv for testing
-        env_path = os.path.join(self.root_path, 'test-env')
+        env_path = os.path.join(self.root_path, 'env')
 
         # Where we'll put the setuptools and virtualenv packages (if necessary)
-        aux_pkg_path = os.path.join(self.root_path, 'test-pkgs')
+        aux_pkg_path = os.path.join(self.root_path, 'pkgs')
         sys.path.insert(0, aux_pkg_path)
 
         for d in (download_cache, aux_pkg_path, env_path, scratch_path):
