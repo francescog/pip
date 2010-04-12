@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 import os, sys, tempfile, shutil
+from path import Path
 
 pyversion = sys.version[:3]
-lib_py = 'lib/python%s/' % pyversion
 here = os.path.dirname(os.path.abspath(__file__))
 
 sys.path.insert(
@@ -54,22 +54,27 @@ def create_virtualenv(where):
 class TestPipEnvironment(TestFileEnvironment):
 
     def __init__(self):
-        self.root_path = tempfile.mkdtemp()
+        self.root_path = Path(tempfile.mkdtemp('piptest-'))
 
         # We will set up a virtual environment at root_path.  
-        scratch_path = os.path.join(self.root_path,'test-scratch')
-        download_cache = os.path.join(self.root_path, 'test-cache')
+        self.scratch_path = self.root_path / 'scratch'
+        download_cache = self.root_path / 'cache'
 
         # where we'll create the virtualenv for testing
-        env_path = os.path.join(self.root_path, 'test-env')
+        self.relative_env_path = Path('env')
+        self.env_path = self.root_path / self.relative_env_path
 
         # Where we'll put the setuptools and virtualenv packages (if necessary)
-        aux_pkg_path = os.path.join(self.root_path, 'test-pkgs')
+        aux_pkg_path = os.path.join(self.root_path, 'pkgs')
         sys.path.insert(0, aux_pkg_path)
 
-        for d in (download_cache, aux_pkg_path, env_path):
+        for d in (download_cache, aux_pkg_path, self.env_path, self.scratch_path):
             if not os.path.exists(d): 
                 os.makedirs(d)
+
+        self.site_packages = Path(
+            'env','lib', 'python'+pyversion, 'site-packages'
+            )
 
         # current environment, but wihtout all "PIP_" environment
         # variables...
@@ -84,7 +89,9 @@ class TestPipEnvironment(TestFileEnvironment):
         # pip.baseparser.ConfigOptionParser.update_defaults(...)
         environ['PIP_DOWNLOAD_CACHE'] = download_cache
         environ['PIP_NO_INPUT'] = '1'
-        environ['PIP_LOG_FILE'] = './pip-log.txt'
+        # Avoid creating the log file in the scratch directory where
+        # it will be detected as a change
+        environ['PIP_LOG_FILE'] = self.root_path / 'pip-log.txt'
 
         # environ['DISTUTILS_DEBUG'] = 'YES'
 
@@ -110,20 +117,24 @@ class TestPipEnvironment(TestFileEnvironment):
         install_requirement('virtualenv', aux_pkg_path)
         
         # create the testing environment
-        create_virtualenv(env_path)
+        create_virtualenv(self.env_path)
 
-        # Run everything in that environment.  Setting PATH is the
-        # only significant thing done by virtualenv's activate script
+        # Run everything else in that environment.  Setting PATH is
+        # the only significant thing done by virtualenv's activate
+        # script.
         #
         # TODO: this is a maintenance hazard.  How can we keep it in 
         # sync with bin/activate?
-        bin = os.path.join(env_path,'bin')
+        bin = os.path.join(self.env_path,'bin')
         environ['PATH'] = os.path.pathsep.join((bin, environ['PATH']))
 
         super(TestPipEnvironment, self).__init__(
-            scratch_path, ignore_hidden=False, environ=environ, split_cmd=False)
+            self.root_path, ignore_hidden=False, environ=environ, split_cmd=False, 
+            start_clear=False, cwd=self.scratch_path)
 
-        print self.run('python', 'setup.py', 'install', cwd=os.path.join(here,os.pardir)).stdout
+        # Now install ourselves there
+        self.run('python', 'setup.py', 'install', cwd=os.path.join(here,os.pardir))
+        
         # env.run(sys.executable, '-c', 'import os;os.mkdir("src")')
 
     def __del__(self):
@@ -142,9 +153,8 @@ except NameError:
 env = None
 def reset_env():
     global env
-
-    import tempfile
     env = TestPipEnvironment()
+    return env
 
 def run_pip(*args, **kw):
     # args = (sys.executable, '-c', 'import pip; pip.main()', '-E', env.base_path) + args
