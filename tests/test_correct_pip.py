@@ -22,10 +22,6 @@ def test_correct_pip_version():
     import sys
     env = get_env()
 
-    print env.run( 
-        sys.executable, '-c', 'import pip; print "loaded pip module at:", pip.__file__', '-E', env.base_path 
-        ).stdout
-    
     diffs = filecmp.dircmp(join(base,'pip'), join(dir,'pip'))
 
     # If any non-matching .py files exist, we have a problem: run_pip
