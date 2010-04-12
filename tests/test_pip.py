@@ -67,7 +67,7 @@ class TestPipEnvironment(TestFileEnvironment):
         aux_pkg_path = os.path.join(self.root_path, 'test-pkgs')
         sys.path.insert(0, aux_pkg_path)
 
-        for d in (download_cache, aux_pkg_path, env_path):
+        for d in (download_cache, aux_pkg_path, env_path, scratch_path):
             if not os.path.exists(d): 
                 os.makedirs(d)
 
@@ -122,7 +122,8 @@ class TestPipEnvironment(TestFileEnvironment):
         environ['PATH'] = os.path.pathsep.join((bin, environ['PATH']))
 
         super(TestPipEnvironment, self).__init__(
-            scratch_path, ignore_hidden=False, environ=environ, split_cmd=False)
+            self.root_path, ignore_hidden=False, environ=environ, split_cmd=False, 
+            start_clear=False, cwd=scratch_path)
 
         # Now install ourselves there
         self.run('python', 'setup.py', 'install', cwd=os.path.join(here,os.pardir))
