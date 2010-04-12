@@ -112,8 +112,9 @@ class TestPipEnvironment(TestFileEnvironment):
         # create the testing environment
         create_virtualenv(env_path)
 
-        # Run everything in that environment.  Setting PATH is the
-        # only significant thing done by virtualenv's activate script
+        # Run everything else in that environment.  Setting PATH is
+        # the only significant thing done by virtualenv's activate
+        # script.
         #
         # TODO: this is a maintenance hazard.  How can we keep it in 
         # sync with bin/activate?
@@ -123,7 +124,9 @@ class TestPipEnvironment(TestFileEnvironment):
         super(TestPipEnvironment, self).__init__(
             scratch_path, ignore_hidden=False, environ=environ, split_cmd=False)
 
-        print self.run('python', 'setup.py', 'install', cwd=os.path.join(here,os.pardir)).stdout
+        # Now install ourselves there
+        self.run('python', 'setup.py', 'install', cwd=os.path.join(here,os.pardir))
+        
         # env.run(sys.executable, '-c', 'import os;os.mkdir("src")')
 
     def __del__(self):
