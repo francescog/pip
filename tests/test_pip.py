@@ -163,7 +163,11 @@ def run_pip(*args, **kw):
     return get_env().run('pip', *args, **kw)
 
 def write_file(filename, text):
-    f = open(os.path.join(base_path, filename), 'w')
+    """Write a file in the base_path
+    
+    """
+    env = get_env()
+    f = open(env.base_path/ filename, 'w')
     f.write(text)
     f.close()
 
