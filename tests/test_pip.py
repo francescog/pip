@@ -1,20 +1,134 @@
 #!/usr/bin/env python
-import os, sys
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-import doctest
+import os, sys, tempfile, shutil
 
 pyversion = sys.version[:3]
 lib_py = 'lib/python%s/' % pyversion
 here = os.path.dirname(os.path.abspath(__file__))
-base_path = os.path.join(here, 'test-scratch')
-download_cache = os.path.join(here, 'test-cache')
-if not os.path.exists(download_cache):
-    os.makedirs(download_cache)
+
+sys.path.insert(
+    0, 
+    os.path.join(os.path.dirname(__file__), os.path.pardir, 'scripttest'))
 
 from scripttest import TestFileEnvironment
 
-if 'PYTHONPATH' in os.environ:
-    del os.environ['PYTHONPATH']
+def install_requirement(req, where):
+    """if the given package requirement isn't installed, install it in the specified directory
+    """
+    # Some of this logic stolen from ez_setup.py
+    # At this point, we already have setuptools installed
+    import pkg_resources, site
+
+    try: pkg_resources.require(req)
+    except pkg_resources.VersionConflict: pass
+    except pkg_resources.DistributionNotFound: pass
+    else: return
+
+    try:
+        from setuptools.command.easy_install import main as install
+    except ImportError:
+        from easy_install import main as install
+
+    # we have to patch PYTHONPATH to include the installation
+    # directory, to satisfy easy_install's nannying
+    save_ppath = os.environ.get('PYTHONPATH', '')
+    try:
+        os.environ['PYTHONPATH'] = where
+        install(['--install-dir', where, req])
+        site.addsitedir(where)
+    finally:
+        os.environ['PYTHONPATH'] = save_ppath
+
+
+def create_virtualenv(where):
+    save_argv = sys.argv
+    
+    try:
+        import virtualenv
+        sys.argv = ['virtualenv', '--no-site-packages', where]
+        virtualenv.main()
+    finally: 
+        sys.argv = save_argv
+
+    return virtualenv.path_locations(where)
+
+class TestPipEnvironment(TestFileEnvironment):
+
+    def __init__(self):
+        self.root_path = tempfile.mkdtemp()
+
+        # We will set up a virtual environment at root_path.  
+        scratch_path = os.path.join(self.root_path,'test-scratch')
+        download_cache = os.path.join(self.root_path, 'test-cache')
+
+        # where we'll create the virtualenv for testing
+        env_path = os.path.join(self.root_path, 'test-env')
+
+        # Where we'll put the setuptools and virtualenv packages (if necessary)
+        aux_pkg_path = os.path.join(self.root_path, 'test-pkgs')
+        sys.path.insert(0, aux_pkg_path)
+
+        for d in (download_cache, aux_pkg_path, env_path):
+            if not os.path.exists(d): 
+                os.makedirs(d)
+
+        # current environment, but wihtout all "PIP_" environment
+        # variables...
+        environ = dict( ((k, v) for k, v in os.environ.iteritems()
+                         if not k.lower().startswith('pip_') 
+                         # ...or PYTHONPATH
+                         and not k.lower() == 'pythonpath') )
+
+        # Prepare option defaults for pip.  Note that even though some
+        # of their names don't appear elsewhere in our source, the
+        # values of these variables *will* be used by
+        # pip.baseparser.ConfigOptionParser.update_defaults(...)
+        environ['PIP_DOWNLOAD_CACHE'] = download_cache
+        environ['PIP_NO_INPUT'] = '1'
+        environ['PIP_LOG_FILE'] = './pip-log.txt'
+
+        # environ['DISTUTILS_DEBUG'] = 'YES'
+
+        #
+        # Make sure a recent-enough version of setuptools is on the path
+        #
+        required_setuptools_version = '0.6c11'
+        try:
+            # see if a recent-enough version of setuptools is already
+            # installed.  We do this in a subprocess so that we don't
+            # end up importing one that's too old, which would make it
+            # impossible for ez_setup to install the newer one
+            subprocess.check_call(
+                ( sys.executable, '-c',
+                  "import pkg_resources;pkg_resources.require('setuptools>=%s')"
+                  % required_setuptools_version ))
+        except:
+            from ez_setup import use_setuptools
+            use_setuptools(
+                version=required_setuptools_version, download_delay=0, to_dir=aux_pkg_path)
+        
+        # make sure virtualenv is installed
+        install_requirement('virtualenv', aux_pkg_path)
+        
+        # create the testing environment
+        create_virtualenv(env_path)
+
+        # Run everything in that environment.  Setting PATH is the
+        # only significant thing done by virtualenv's activate script
+        #
+        # TODO: this is a maintenance hazard.  How can we keep it in 
+        # sync with bin/activate?
+        bin = os.path.join(env_path,'bin')
+        environ['PATH'] = os.path.pathsep.join((bin, environ['PATH']))
+
+        super(TestPipEnvironment, self).__init__(
+            scratch_path, ignore_hidden=False, environ=environ, split_cmd=False)
+
+        print self.run('python', 'setup.py', 'install', cwd=os.path.join(here,os.pardir)).stdout
+        # env.run(sys.executable, '-c', 'import os;os.mkdir("src")')
+
+    def __del__(self):
+        # shutil.rmtree(self.root_path)
+        pass
 
 try:
     any
@@ -25,62 +139,18 @@ except NameError:
                 return True
         return False
 
-def clear_environ(environ):
-    return dict(((k, v) for k, v in environ.iteritems()
-                if not k.lower().startswith('pip_')))
-
-def install_setuptools(env):
-    easy_install = os.path.join(env.bin_dir, 'easy_install')
-    version = 'setuptools==0.6c11'
-    if sys.platform != 'win32':
-        return env.run(easy_install, version)
-    
-    import tempfile, shutil
-    tempdir = tempfile.mkdtemp()
-    try:
-        shutil.copy2(easy_install+'.exe', tempdir)
-        shutil.copy2(easy_install+'-script.py', tempdir)
-        return env.run(os.path.join(tempdir, 'easy_install'), version)
-    finally:
-        shutil.rmtree(tempdir)
-            
-    
 env = None
-def reset_env(environ=None):
+def reset_env():
     global env
-    if not environ:
-        environ = os.environ.copy()
-        environ = clear_environ(environ)
-        environ['PIP_DOWNLOAD_CACHE'] = download_cache
-    environ['PIP_NO_INPUT'] = '1'
-    environ['PIP_LOG_FILE'] = './pip-log.txt'
-    environ['PYTHONPATH'] = os.path.abspath(os.path.join(__file__, os.path.pardir, os.path.pardir))
-    env = TestFileEnvironment(base_path, ignore_hidden=False, environ=environ, split_cmd=False)
-    env.run(sys.executable, '-m', 'virtualenv', '--no-site-packages', env.base_path)
-    where = env.run(sys.executable, '-c', 
-                    'import virtualenv;'
-                    'virtualenv.logger = virtualenv.Logger([]);'
-                    'print repr(virtualenv.path_locations(%r))'%env.base_path)
-    env.home_dir, env.lib_dir, env.inc_dir, env.bin_dir = eval(where.stdout.strip())
-    # make sure we have current setuptools to avoid svn incompatibilities
-    install_setuptools(env)
 
-    # Uninstall whatever version of pip might have been there.  We do
-    # it this way because on Windows pip can't delete itself while executing.
-#    env.run(sys.executable, '-c', 'import pip;pip.main()', 'uninstall', '-y', 'pip')
-    # Uninstall (kind of) pip, so PYTHONPATH can take effect:
-    env.run('%s/bin/easy_install' % env.base_path, '-m', 'pip')
-
-    # Install this version on top of it
-    env.run(os.path.join(env.bin_dir, 'python'), os.path.join(here,os.pardir,'setup.py'), 'install')
-
-    env.run(sys.executable, '-c', 'import os;os.mkdir("src")')
+    import tempfile
+    env = TestPipEnvironment()
 
 def run_pip(*args, **kw):
-    args = (sys.executable, '-c', 'import pip; pip.main()', '-E', env.base_path) + args
-    #print >> sys.__stdout__, 'running', ' '.join(args)
-    result = env.run(*args, **kw)
-    return result
+    # args = (sys.executable, '-c', 'import pip; pip.main()', '-E', env.base_path) + args
+    # result = env.run(*args, **kw)
+    # return result
+    return get_env().run('pip', *args, **kw)
 
 def write_file(filename, text):
     f = open(os.path.join(base_path, filename), 'w')
@@ -88,6 +158,8 @@ def write_file(filename, text):
     f.close()
 
 def get_env():
+    if env is None:
+        reset_env()
     return env
 
 # FIXME ScriptTest does something similar, but only within a single
