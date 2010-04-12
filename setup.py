@@ -1,16 +1,5 @@
-import sys
-force_setuptools = False
-for command in ('upload', 'develop', 'egg_info',):
-    if command in sys.argv:
-        force_setuptools = True
-if sys.platform == 'win32':
-    force_setuptools = True
-if force_setuptools:
-    from setuptools import setup
-else:
-    from distutils.core import setup
-import os
-
+import os, sys
+from setuptools import setup
 
 version = "0.6.3.post1"
 
@@ -31,7 +20,7 @@ else:
 
 # Allows reset_env in test_pip.py to invoke setup.py from outside the
 # directory where it's located, which is needed to prepare a proper
-# virtual environment from without performing unnatural contortions.
+# virtual environment without performing unnatural contortions.
 os.chdir(os.path.dirname(os.path.join(os.path.curdir,__file__)))
 
 setup(name='pip',
