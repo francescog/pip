@@ -35,5 +35,7 @@ setup(name='pip',
       author_email='python-virtualenv@groups.google.com',
       url='http://pip.openplans.org',
       license='MIT',
-      packages=['pip', 'pip.commands', 'pip.vcs'],
+      packages=['pip', 'pip.commands', 'pip.vcs', 'scripttest'],
+      package_dir={ 'scripttest':os.path.join('scripttest', 'scripttest') },
       **kw)
+      
