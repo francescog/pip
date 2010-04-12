@@ -84,7 +84,9 @@ class TestPipEnvironment(TestFileEnvironment):
         # pip.baseparser.ConfigOptionParser.update_defaults(...)
         environ['PIP_DOWNLOAD_CACHE'] = download_cache
         environ['PIP_NO_INPUT'] = '1'
-        environ['PIP_LOG_FILE'] = './pip-log.txt'
+        # Avoid creating the log file in the scratch directory where
+        # it will be detected as a change
+        environ['PIP_LOG_FILE'] = self.root_path / 'pip-log.txt'
 
         # environ['DISTUTILS_DEBUG'] = 'YES'
 
