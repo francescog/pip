@@ -2,7 +2,9 @@
 import os
 import textwrap
 from doctest import OutputChecker, ELLIPSIS
-from test_pip import base_path, reset_env, run_pip, pyversion, lib_py, write_file, get_env
+#from test_pip import base_path, reset_env, run_pip, pyversion, lib_py, write_file, get_env
+from test_pip import  reset_env, run_pip, pyversion,  write_file, get_env
+
 
 def test_freeze():
     """
@@ -79,29 +81,26 @@ def test_freeze_git_clone():
     Test freezing a Git clone.
     
     """
-    reset_env()
-    env = get_env()
+    env = reset_env()
     checker = OutputChecker()
     result = env.run('git', 'clone', 'git://github.com/jezdez/django-pagination.git', 'django-pagination')
     result = env.run('git', 'checkout', '1df6507872d73ee387eb375428eafbfc253dfcd8',
-            cwd=os.path.join(env.base_path, 'django-pagination'), expect_stderr=True)
-    result = env.run(os.path.join(env.bin_dir, 'python'), 'setup.py', 'develop',
-            cwd=os.path.join(env.base_path, 'django-pagination'))
+            cwd= env.scratch_path/ 'django-pagination', expect_stderr=True)
+    result = env.run('python', 'setup.py', 'develop',
+            cwd=env.scratch_path / 'django-pagination')
     result = run_pip('freeze', expect_stderr=True)
-    expected = textwrap.dedent("""\
-        Script result: ...ython... pip.main() -E .../test-scratch freeze
-        -- stdout: --------------------
-        -e git://github.com/jezdez/django-pagination.git@...#egg=django_pagination-...
-        ...""")
+    expected = textwrap.dedent("""Script result: pip freeze
+-- stdout: --------------------
+-e git://github.com/jezdez/django-pagination.git@...#egg=django_pagination-...
+...""")
     assert checker.check_output(expected, str(result), ELLIPSIS), result
 
     result = run_pip('freeze', '-f', 'git://github.com/jezdez/django-pagination.git#egg=django_pagination', expect_stderr=True)
-    expected = textwrap.dedent("""\
-        Script result: ...ython... pip.main() -E .../test-scratch freeze -f git://github.com/jezdez/django-pagination.git#egg=django_pagination
-        -- stdout: --------------------
-        -f git://github.com/jezdez/django-pagination.git#egg=django_pagination
-        -e git://github.com/jezdez/django-pagination.git@...#egg=django_pagination-...-dev
-        ...""")
+    expected = textwrap.dedent("""Script result: pip freeze -f git://github.com/jezdez/django-pagination.git#egg=django_pagination
+-- stdout: --------------------
+-f git://github.com/jezdez/django-pagination.git#egg=django_pagination
+-e git://github.com/jezdez/django-pagination.git@...#egg=django_pagination-...-dev...
+...""")
     assert checker.check_output(expected, str(result), ELLIPSIS), result
 
 def test_freeze_mercurial_clone():
