@@ -11,8 +11,6 @@ def test_download_if_requested():
     """
     env = reset_env()
     result = run_pip('install', 'INITools==0.1', '-d', '.', expect_error=True)
-    from pprint import pprint
-    pprint( result.files_created.keys() )
     assert Path('scratch')/ 'INITools-0.1.tar.gz' in result.files_created
     assert env.site_packages/ 'initools' not in result.files_created
 
@@ -25,7 +23,5 @@ def test_single_download_from_requirements_file():
         INITools==0.1
         """))
     result = run_pip('install', '-r', env.base_path/ 'test-req.txt', '-d', '.', expect_error=True)
-    from pprint import pprint
-    pprint( result.files_created.keys() )
     assert Path('scratch')/ 'INITools-0.1.tar.gz' in result.files_created
     assert env.site_packages/ 'initools' not in result.files_created

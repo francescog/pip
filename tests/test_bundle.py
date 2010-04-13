@@ -23,8 +23,6 @@ def test_create_bundle():
     # Create a bundle in env.base_path/ test.pybundle
     result = run_pip('bundle', '-r', env.base_path/ 'bundle-req.txt', env.base_path/ 'test.pybundle')
     bundle = result.files_after.get('test.pybundle', None)
-    from pprint import pprint
-    pprint(result.files_after)
     assert bundle is not None
 
     files = zipfile.ZipFile(bundle.full).namelist()
