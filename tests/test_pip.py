@@ -9,6 +9,8 @@ download_cache = os.path.join(here, 'test-cache')
 if not os.path.exists(download_cache):
     os.makedirs(download_cache)
 
+# Tweak the path so we can find scripttest
+sys.path = [os.path.join(os.path.dirname(here), 'scripttest')] + sys.path
 from scripttest import TestFileEnvironment
 
 if 'PYTHONPATH' in os.environ:
@@ -33,6 +35,22 @@ def virtualenv_bin_dir(path):
     else:
         return os.path.join(path, 'bin')
 
+def install_setuptools(env):
+    easy_install = os.path.join(env.bin_dir, 'easy_install')
+    version = 'setuptools==0.6c11'
+    if sys.platform != 'win32':
+        return env.run(easy_install, version)
+    
+    import tempfile, shutil
+    tempdir = tempfile.mkdtemp()
+    try:
+        shutil.copy2(easy_install+'.exe', tempdir)
+        shutil.copy2(easy_install+'-script.py', tempdir)
+        return env.run(os.path.join(tempdir, 'easy_install'), version)
+    finally:
+        shutil.rmtree(tempdir)
+            
+    
 env = None
 def reset_env(environ=None):
     global env
@@ -43,17 +61,24 @@ def reset_env(environ=None):
     environ['PIP_NO_INPUT'] = '1'
     environ['PIP_LOG_FILE'] = './pip-log.txt'
 
-    env = TestFileEnvironment(base_path, ignore_hidden=False, environ=environ)
+    env = TestFileEnvironment(base_path, ignore_hidden=False, environ=environ, split_cmd=False)
     env.run(sys.executable, '-m', 'virtualenv', '--no-site-packages', env.base_path)
 
     # put the test-scratch virtualenv's bin dir first on the script path
     env.script_path.insert(0, virtualenv_bin_dir(env.base_path))
-    
+
+    # Figure out where the virtualenv is putting things
+    where = env.run(sys.executable, '-c', 
+                    'import virtualenv;'
+                    'virtualenv.logger = virtualenv.Logger([]);'
+                    'print repr(virtualenv.path_locations(%r))'%env.base_path)
+    env.home_dir, env.lib_dir, env.inc_dir, env.bin_dir = eval(where.stdout.strip())
+
     # make sure we have current setuptools to avoid svn incompatibilities
-    env.run('easy_install', 'setuptools==0.6c11')
+    install_setuptools(env)
 
     # Uninstall whatever version of pip came with the virtualenv
-    env.run('pip', 'uninstall', '-y', 'pip')
+    env.run(os.path.join(env.bin_dir,'pip'), 'uninstall', '-y', 'pip')
 
     # Install this version instead
     env.run('python', 'setup.py', 'install', cwd=os.path.dirname(here))
