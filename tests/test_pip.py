@@ -162,12 +162,16 @@ def run_pip(*args, **kw):
     # return result
     return get_env().run('pip', *args, **kw)
 
-def write_file(filename, text):
-    """Write a file in the base_path
+def write_file(filename, text, dest=None):
+    """Write a file in the dest (default=env.scratch_path)
     
     """
     env = get_env()
-    f = open(env.base_path/ filename, 'w')
+    if dest:
+        complete_path = dest/ filename
+    else:
+        complete_path = env.scratch_path/ filename
+    f = open(complete_path, 'w')
     f.write(text)
     f.close()
 
