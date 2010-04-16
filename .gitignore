@@ -6,4 +6,5 @@ test-scratch/
 *.egg-info/
 *.swp
 log*.txt
-
+*.orig
+.gitignore.*.gitignore
