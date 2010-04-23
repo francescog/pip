@@ -1,6 +1,15 @@
 
 from os.path import abspath, join, dirname, pardir
-from test_pip import here, reset_env, run_pip, pyversion, lib_py
+from test_pip import here, reset_env, get_env, run_pip, pyversion, lib_py
+
+def test_working_cmake():
+    """
+    Test the presence of cmake
+    """
+    reset_env()
+    env = get_env()
+    result = env.run('cmake', '--version')
+    assert "cmake version" in result.stdout, result.stdout
 
 def test_install_ryppl_from_git():
     """
