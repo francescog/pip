@@ -17,7 +17,7 @@ def test_install_ryppl_from_git():
     
     """
     reset_env()
-    result = run_pip('ryppl_install', '-e', 'git://github.com/francescog/sample_ryppl_package.git', expect_error=True)
+    result = run_pip('ryppl_install', 'git://github.com/francescog/sample_ryppl_package.git', expect_error=True)
     print result
     print result.stdout
     print result.stderr

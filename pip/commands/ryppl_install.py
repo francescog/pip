@@ -115,13 +115,14 @@ class RypplInstallCommand(Command):
             options.build_dir = os.path.abspath(options.build_dir)
             options.src_dir = os.path.abspath(options.src_dir)
         install_options = options.install_options or []
-        index_urls = [options.index_url] + options.extra_index_urls
+        #TODO: we will have to introduce something similar to PyPI
+        #index_urls = [options.index_url] + options.extra_index_urls
         if options.no_index:
             logger.notify('Ignoring indexes: %s' % ','.join(index_urls))
             index_urls = []
-        finder = PackageFinder(
-            find_links=options.find_links,
-            index_urls=index_urls)
+        #finder = PackageFinder(
+        #    find_links=options.find_links,
+        #    index_urls=index_urls)
         requirement_set = RequirementSet(
             build_dir=options.build_dir,
             src_dir=options.src_dir,
@@ -132,17 +133,16 @@ class RypplInstallCommand(Command):
             ignore_dependencies=options.ignore_dependencies)
         for name in args:
             requirement_set.add_requirement(
-                InstallRequirement.from_line(name, None))
+                RypplInstallRequirement.from_line(name, None))
         for name in options.editables:
             requirement_set.add_requirement(
-                InstallRequirement.from_editable(name, default_vcs=options.default_vcs))
+                RypplInstallRequirement.from_editable(name, default_vcs=options.default_vcs))
         for filename in options.requirements:
-            for req in parse_requirements(filename, finder=finder, options=options):
-                requirement_set.add_requirement(req)
-        print "requirement_set from RypplInstall:"
-        print requirement_set
+            for req in parse_requirements(filename, finder=None, options=options):
+                requirement_set.add_requirement(req)    
+        print "requirement_set from RypplInstall:\n\t%(build)s\n\t%(src)s\n\t%(download)s " % {'build':requirement_set.build_dir, 'src':requirement_set.src_dir, 'download':requirement_set.download_dir}
         
-        requirement_set.install_files(finder, force_root_egg_info=self.bundle, bundle=self.bundle)
+        #requirement_set.install_files(finder, force_root_egg_info=self.bundle, bundle=self.bundle)
         if not options.no_install and not self.bundle:
             requirement_set.install(install_options)
             installed = ' '.join([req.name for req in
