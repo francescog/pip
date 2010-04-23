@@ -82,6 +82,7 @@ def reset_env(environ=None):
 
     # Install this version instead
     env.run('python', 'setup.py', 'install', cwd=os.path.dirname(here))
+    print env.run('pip', '--version')
 
 def run_pip(*args, **kw):
     args = ('pip',) + args
