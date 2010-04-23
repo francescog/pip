@@ -139,6 +139,9 @@ class RypplInstallCommand(Command):
         for filename in options.requirements:
             for req in parse_requirements(filename, finder=finder, options=options):
                 requirement_set.add_requirement(req)
+        print "requirement_set from RypplInstall:"
+        print requirement_set
+        
         requirement_set.install_files(finder, force_root_egg_info=self.bundle, bundle=self.bundle)
         if not options.no_install and not self.bundle:
             requirement_set.install(install_options)
@@ -153,4 +156,4 @@ class RypplInstallCommand(Command):
                 logger.notify('Successfully downloaded %s' % downloaded)
         return requirement_set
 
-InstallCommand()
+RypplInstallCommand()
