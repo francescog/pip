@@ -1,6 +1,7 @@
 build
 ._*
 *.pyc
+pip/dist/
 test-cache/
 test-scratch/
 *.egg-info/
