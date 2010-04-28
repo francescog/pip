@@ -70,12 +70,7 @@ def test_install_editable_from_svn():
     """
     e = reset_env()
     result = run_pip('install', '-e', 'svn+http://svn.colorstudy.com/INITools/trunk#egg=initools-dev', expect_error=True)
-    egg_link = result.files_created[e.site_packages / 'INITools.egg-link']
-    # FIXME: I don't understand why there's a trailing . here:
-    assert egg_link.bytes.endswith('/test-scratch/src/initools\n.'), egg_link.bytes
-    assert (e.site_packages / 'easy-install.pth') in result.files_updated
-    assert 'src/initools' in result.files_created
-    assert 'src/initools/.svn' in result.files_created
+    result.assert_installed('INITools', with_files=['.svn'])
 
 def test_download_editable_to_custom_path():
     """
@@ -106,12 +101,7 @@ def test_editable_no_install_followed_by_no_download():
 
     result = run_pip('install', '-e', 'svn+http://svn.colorstudy.com/INITools/trunk#egg=initools-dev',
         '--no-download',  expect_error=True)
-    egg_link = result.files_created[lib_py + 'site-packages/INITools.egg-link']
-    # FIXME: I don't understand why there's a trailing . here:
-    assert egg_link.bytes.endswith('/test-scratch/src/initools\n.'), egg_link.bytes
-    assert (lib_py + 'site-packages/easy-install.pth') in result.files_updated
-    assert 'src/initools' not in result.files_created
-    assert 'src/initools/.svn' not in result.files_created
+    result.assert_installed('INITools', without_files=['', '.svn'])
 
 def test_no_install_followed_by_no_download():
     """
@@ -158,14 +148,7 @@ def test_install_editable_from_git():
     """
     e = reset_env()
     result = run_pip('install', '-e', 'git://github.com/jezdez/django-feedutil.git#egg=django-feedutil', expect_error=True)
-    egg_link = result.files_created[e.site_packages / 'django-feedutil.egg-link']
-    # FIXME: I don't understand why there's a trailing . here:
-    assert egg_link.bytes.endswith('.'), egg_link.bytes
-    #remove trailing "\n." and check that django-feedutil was installed
-    assert egg_link.bytes[:-1].strip().endswith(e.env_path/ 'src' / 'django-feedutil'), egg_link.bytes
-    assert e.site_packages / 'easy-install.pth' in result.files_updated
-    assert e.relative_env_path / 'src' / 'django-feedutil' in result.files_created
-    assert e.relative_env_path / 'src' / 'django-feedutil' / '.git' in result.files_created
+    result.assert_installed('django-feedutil', with_files=['.git'])
 
 def test_install_editable_from_hg():
     """
@@ -174,15 +157,7 @@ def test_install_editable_from_hg():
     """
     e = reset_env()
     result = run_pip('install', '-e', 'hg+http://bitbucket.org/ubernostrum/django-registration/#egg=django-registration', expect_error=True)
-    egg_link = result.files_created[e.site_packages / 'django-registration.egg-link']
-    # FIXME: I don't understand why there's a trailing . here:
-    assert egg_link.bytes.endswith('.'), egg_link.bytes
-    #remove trailing "\n." and check that django-registration was installed
-    assert egg_link.bytes[:-1].strip().endswith(e.env_path/ 'src' / 'django-registration'), egg_link.bytes
-    assert e.site_packages / 'easy-install.pth' in result.files_updated
-    assert e.relative_env_path / 'src' / 'django-registration' in result.files_created
-    assert e.relative_env_path / 'src' / 'django-registration'/'.hg' in result.files_created
-
+    result.assert_installed('django-registration', with_files=['.hg'])
 
 def test_vcs_url_final_slash_normalization():
     """
@@ -200,14 +175,7 @@ def test_install_editable_from_bazaar():
     """
     e = reset_env()
     result = run_pip('install', '-e', 'bzr+http://bazaar.launchpad.net/%7Edjango-wikiapp/django-wikiapp/release-0.1/@174#egg=django-wikiapp', expect_error=True)
-    egg_link = result.files_created[e.site_packages / 'django-wikiapp.egg-link']
-    # FIXME: I don't understand why there's a trailing . here:
-    assert egg_link.bytes.endswith('.'), egg_link.bytes
-    #remove trailing "\n." and check that django-wikiapp was installed
-    assert egg_link.bytes[:-1].strip().endswith(e.env_path/ 'src' / 'django-wikiapp'), egg_link.bytes
-    assert e.site_packages / 'easy-install.pth' in result.files_updated
-    assert e.relative_env_path / 'src' / 'django-wikiapp' in result.files_created
-    assert e.relative_env_path / 'src' /'django-wikiapp' / '.bzr' in result.files_created
+    result.assert_installed('django-wikiapp', with_files=['.bzr'])
 
 
 def test_vcs_url_urlquote_normalization():
