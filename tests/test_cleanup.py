@@ -3,6 +3,7 @@ import zipfile
 import textwrap
 from os.path import abspath, exists, join
 from test_pip import here, reset_env, run_pip, write_file
+from path import Path;
 
 
 def test_cleanup_after_install_from_pypi():
@@ -22,10 +23,10 @@ def test_cleanup_after_install_editable_from_hg():
     Test clean up after cloning from Mercurial.
     
     """
-    reset_env()
+    env = reset_env()
     result = run_pip('install', '-e', 'hg+http://bitbucket.org/ubernostrum/django-registration/#egg=django-registration', expect_error=True)
-    build = join(base_path, "build")
-    src = join(base_path, "src")
+    build = env.env_path/'build'
+    src = env.env_path/'src'
     assert not exists(build), "build/ dir still exists: %s" % build
     assert exists(src), "expected src/ dir doesn't exist: %s" % src
 
