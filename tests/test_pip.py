@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os, sys, tempfile, shutil, glob, atexit
+import os, sys, tempfile, shutil, glob, atexit, textwrap
 from path import *
 
 pyversion = sys.version[:3]
@@ -102,40 +102,54 @@ class TestPipResult(object):
     def __getattr__(self, attr):
         return getattr(self._impl,attr)
         
-    def assert_installed(self, pkg_name, with_files=[], without_files=[]):
+    def assert_installed(self, pkg_name, with_files=[], without_files=[], without_egg_link=False):
         e = self.test_env
-        egg_link_path = e.site_packages / pkg_name + '.egg-link'
-        egg_link_file = self.files_created[egg_link_path]
-        pkg_relpath = e.env_path/ 'src'/ pkg_name.lower()
 
-        if not (# FIXME: I don't understand why there's a trailing . here
-                egg_link_file.bytes.endswith('.')
-            and egg_link_file.bytes[:-1].strip().endswith(pkg_relpath)):
-            raise TestFailure, textwrap.dedent(u'''\
-            Incorrect egg_link file %r
-            Expected ending: %r
-            ------- Actual contents -------
-            %s
-            -------------------------------''' % (
-                    egg_link_file, 
-                    pkg_relpath + u'\n.',
-                    egg_link_file.bytes))
+        pkg_dir = e.relative_env_path/ 'src'/ pkg_name.lower()
+
+        egg_link_path = e.site_packages / pkg_name + '.egg-link'
+        if without_egg_link:
+            if egg_link_path in self.files_created:
+                raise TestFailure, 'unexpected egg link file created: %r' % egg_link_path
+        else:
+            egg_link_file = self.files_created[egg_link_path]
+
+            if not (# FIXME: I don't understand why there's a trailing . here
+                    egg_link_file.bytes.endswith('.')
+                and egg_link_file.bytes[:-1].strip().endswith(pkg_dir)):
+                raise TestFailure, textwrap.dedent(u'''\
+                Incorrect egg_link file %r
+                Expected ending: %r
+                ------- Actual contents -------
+                %s
+                -------------------------------''' % (
+                        egg_link_file, 
+                        pkg_dir + u'\n.',
+                        egg_link_file.bytes))
 
         pth_file = Path.string(e.site_packages / 'easy-install.pth')
 
-        if not pth_file in self.files_updated:
-            raise TestFailure, '%r not updated by install' % pth_file
+        if (pth_file in self.files_updated) == without_egg_link:
+            raise TestFailure, '%r unexpectedly %supdated by install' % (
+                pth_file, ('' if without_egg_link else 'not '))
 
-        if not (pkg_relpath in self.files_created or '' in without_files):
-            raise TestFailure, 'Package directory %r not created by install' % pkg_relpath
+        if (pkg_dir in self.files_created) == (curdir in without_files):
+            raise TestFailure, textwrap.dedent('''\
+            expected package directory %r %sto be created
+            actually created:
+            %s
+            ''') % (
+                Path.string(pkg_dir), 
+                ('not ' if curdir in without_files else ''), 
+                sorted(self.files_created.keys()))
 
         for f in with_files:
-            if not pkg_relpath/f in self.files_created:
-                raise TestFailure, 'Package directory %r missing expected content %f' % (pkg_relpath,f)
+            if not (pkg_dir/f).normpath in self.files_created:
+                raise TestFailure, 'Package directory %r missing expected content %f' % (pkg_dir,f)
 
         for f in without_files:
-            if pkg_relpath/f in self.files_created:
-                raise TestFailure, 'Package directory %r has unexpected content %f' % (pkg_relpath,f)
+            if (pkg_dir/f).normpath in self.files_created:
+                raise TestFailure, 'Package directory %r has unexpected content %f' % (pkg_dir,f)
 
 class TestPipEnvironment(TestFileEnvironment):
     
