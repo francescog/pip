@@ -106,6 +106,12 @@ class InstallCommand(Command):
             dest='no_install',
             action='store_true',
             help="Download and unpack all packages, but don't actually install them")
+        self.parser.add_option(
+            '--no-download',
+            dest='no_download',
+            action="store_true",
+            help="Don't download any packages, just install the ones already downloaded "
+            "(completes an install run with --no-install)")
 
         self.parser.add_option(
             '--install-option',
@@ -124,9 +130,8 @@ class InstallCommand(Command):
         if options.download_dir:
             options.no_install = True
             options.ignore_installed = True
-        else:
-            options.build_dir = os.path.abspath(options.build_dir)
-            options.src_dir = os.path.abspath(options.src_dir)
+        options.build_dir = os.path.abspath(options.build_dir)
+        options.src_dir = os.path.abspath(options.src_dir)
         install_options = options.install_options or []
         index_urls = [options.index_url] + options.extra_index_urls
         if options.no_index:
@@ -152,7 +157,10 @@ class InstallCommand(Command):
         for filename in options.requirements:
             for req in parse_requirements(filename, finder=finder, options=options):
                 requirement_set.add_requirement(req)
-        requirement_set.install_files(finder, force_root_egg_info=self.bundle, bundle=self.bundle)
+        if not options.no_download:
+            requirement_set.prepare_files(finder, force_root_egg_info=self.bundle, bundle=self.bundle)
+        else:
+            requirement_set.locate_files()
         if not options.no_install and not self.bundle:
             requirement_set.install(install_options)
             installed = ' '.join([req.name for req in
@@ -164,6 +172,12 @@ class InstallCommand(Command):
                                    requirement_set.successfully_downloaded])
             if downloaded:
                 logger.notify('Successfully downloaded %s' % downloaded)
+        elif self.bundle:
+            requirement_set.create_bundle(self.bundle_filename)
+            logger.notify('Created bundle in %s' % self.bundle_filename)
+        # Clean up
+        if not options.no_install:
+            requirement_set.cleanup_files(bundle=self.bundle)
         return requirement_set
 
 InstallCommand()

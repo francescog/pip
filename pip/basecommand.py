@@ -10,7 +10,7 @@ import traceback
 import time
 from pip.log import logger
 from pip.baseparser import parser, ConfigOptionParser, UpdatingDefaultsHelpFormatter
-from pip.exceptions import InstallationError, UninstallationError
+from pip.exceptions import BadCommand, InstallationError, UninstallationError
 from pip.venv import restart_in_venv
 
 __all__ = ['command_dict', 'Command', 'load_all_commands',
@@ -122,6 +122,10 @@ class Command(object):
             logger.fatal(str(e))
             logger.info('Exception information:\n%s' % format_exc())
             exit = 1
+        except BadCommand, e:
+            logger.fatal(str(e))
+            logger.info('Exception information:\n%s' % format_exc())
+            exit = 1
         except:
             logger.fatal('Exception:\n%s' % format_exc())
             exit = 2
@@ -184,6 +188,10 @@ def open_logfile(filename, mode='a'):
     the file to separate past activity from current activity.
     """
     filename = os.path.expanduser(filename)
+    filename = os.path.abspath(filename)
+    dirname = os.path.dirname(filename)
+    if not os.path.exists(dirname):
+        os.makedirs(dirname)
     exists = os.path.exists(filename)
     
     dir = os.path.dirname(filename)

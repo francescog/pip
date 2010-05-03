@@ -1,8 +1,18 @@
 News for pip
 ============
 
-hg tip
-------
+0.7.1
+-----
+
+* Fixed opening of logfile with no directory name. Thanks Alexandre Conrad.
+
+* Temporary files are consistently cleaned up, especially after
+  installing bundles, also from Alex Conrad.
+
+* Tests now require at least ScriptTest 1.0.3.
+
+0.7
+---
 
 * Fixed uninstallation on Windows
 * Added ``pip search`` command.
@@ -30,6 +40,18 @@ hg tip
   ``pip install path/to/dir/``).
 * Fixed installing editable packages with ``svn+ssh`` URLs.
 * Don't print unwanted debug information when running the freeze command.
+* Create log file directory automatically. Thanks Alexandre Conrad.
+* Make test suite easier to run successfully. Thanks Dave Abrahams.
+* Fixed "pip install ." and "pip install .."; better error for directory
+  without setup.py. Thanks Alexandre Conrad.
+* Support Debian/Ubuntu "dist-packages" in zip command. Thanks duckx.
+* Fix relative --src folder. Thanks Simon Cross.
+* Handle missing VCS with an error message. Thanks Alexandre Conrad.
+* Added --no-download option to install; pairs with --no-install to separate
+  download and installation into two steps. Thanks Simon Cross.
+* Fix uninstalling from requirements file containing -f, -i, or
+  --extra-index-url.
+* Leftover build directories are now removed. Thanks Alexandre Conrad.
 
 0.6.3
 -----

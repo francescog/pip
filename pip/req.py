@@ -13,18 +13,18 @@ import urllib
 import ConfigParser
 from distutils.sysconfig import get_python_version
 from email.FeedParser import FeedParser
-from pip.locations import bin_py, site_packages
+from pip.locations import bin_py
 from pip.exceptions import InstallationError, UninstallationError
 from pip.vcs import vcs
 from pip.log import logger
 from pip.util import display_path, rmtree, format_size
 from pip.util import splitext, ask, backup_dir
-from pip.util import url_to_filename, filename_to_url
-from pip.util import is_url, is_filename, is_local, dist_is_local
-from pip.util import normalize_path, egg_link_path
+from pip.util import url_to_path, path_to_url
+from pip.util import is_url, is_installable_dir, is_archive_file, is_local, dist_is_local
+from pip.util import renames, normalize_path, egg_link_path
 from pip.util import make_path_relative, is_svn_page, file_contents
 from pip.util import has_leading_dir, split_leading_dir
-from pip.util import renames, get_file_content
+from pip.util import get_file_content
 from pip.util import in_venv
 from pip import call_subprocess
 from pip.backwardcompat import any, md5
@@ -61,7 +61,7 @@ class InstallRequirement(object):
     def from_editable(cls, editable_req, comes_from=None, default_vcs=None):
         name, url = parse_editable(editable_req, default_vcs)
         if url.startswith('file:'):
-            source_dir = url_to_filename(url)
+            source_dir = url_to_path(url)
         else:
             source_dir = None
         return cls(name, comes_from, source_dir=source_dir, editable=True, url=url)
@@ -69,21 +69,30 @@ class InstallRequirement(object):
     @classmethod
     def from_line(cls, name, comes_from=None):
         """Creates an InstallRequirement from a name, which might be a
-        requirement, filename, or URL.
+        requirement, directory containing 'setup.py', filename, or URL.
         """
         url = None
         name = name.strip()
         req = name
+        path = os.path.normpath(os.path.abspath(name))
+
         if is_url(name):
             url = name
             ## FIXME: I think getting the requirement here is a bad idea:
             #req = get_requirement_from_url(url)
             req = None
-        elif is_filename(name):
-            if not os.path.exists(name):
+        elif os.path.isdir(path):
+            if not is_installable_dir(path):
+                raise InstallationError("Directory %r is not installable. File 'setup.py' not found."
+                                        % name)
+            url = path_to_url(name)
+            #req = get_requirement_from_url(url)
+            req = None
+        elif is_archive_file(path):
+            if not os.path.isfile(path):
                 logger.warn('Requirement %r looks like a filename, but the file does not exist'
                             % name)
-            url = filename_to_url(name)
+            url = path_to_url(name)
             #req = get_requirement_from_url(url)
             req = None
         return cls(req, comes_from, url=url)
@@ -440,6 +449,7 @@ execfile(__file__)
                     paths_to_remove.add(os.path.join(bin_py, name))
                     if sys.platform == 'win32':
                         paths_to_remove.add(os.path.join(bin_py, name) + '.exe')
+                        paths_to_remove.add(os.path.join(bin_py, name) + '.exe.manifest')
                         paths_to_remove.add(os.path.join(bin_py, name) + '-script.py')
 
         paths_to_remove.remove(auto_confirm)
@@ -512,49 +522,53 @@ execfile(__file__)
             return
         temp_location = tempfile.mkdtemp('-record', 'pip-')
         record_filename = os.path.join(temp_location, 'install-record.txt')
-
-        install_args = [sys.executable, '-c',
-                        "import setuptools; __file__=%r; execfile(%r)" % (self.setup_py, self.setup_py),
-                        'install', '--single-version-externally-managed', '--record', record_filename]
-
-        if in_venv():
-            ## FIXME: I'm not sure if this is a reasonable location; probably not
-            ## but we can't put it in the default location, as that is a virtualenv symlink that isn't writable
-            install_args += ['--install-headers',
-                             os.path.join(sys.prefix, 'include', 'site',
-                                          'python' + get_python_version())]
-        logger.notify('Running setup.py install for %s' % self.name)
-        logger.indent += 2
         try:
-            call_subprocess(install_args + install_options,
-                cwd=self.source_dir, filter_stdout=self._filter_install, show_stdout=False)
+
+            install_args = [sys.executable, '-c',
+                            "import setuptools; __file__=%r; execfile(%r)" % (self.setup_py, self.setup_py),
+                            'install', '--single-version-externally-managed', '--record', record_filename]
+
+            if in_venv():
+                ## FIXME: I'm not sure if this is a reasonable location; probably not
+                ## but we can't put it in the default location, as that is a virtualenv symlink that isn't writable
+                install_args += ['--install-headers',
+                                 os.path.join(sys.prefix, 'include', 'site',
+                                              'python' + get_python_version())]
+            logger.notify('Running setup.py install for %s' % self.name)
+            logger.indent += 2
+            try:
+                call_subprocess(install_args + install_options,
+                    cwd=self.source_dir, filter_stdout=self._filter_install, show_stdout=False)
+            finally:
+                logger.indent -= 2
+            self.install_succeeded = True
+            f = open(record_filename)
+            for line in f:
+                line = line.strip()
+                if line.endswith('.egg-info'):
+                    egg_info_dir = line
+                    break
+            else:
+                logger.warn('Could not find .egg-info directory in install record for %s' % self)
+                ## FIXME: put the record somewhere
+                ## FIXME: should this be an error?
+                return
+            f.close()
+            new_lines = []
+            f = open(record_filename)
+            for line in f:
+                filename = line.strip()
+                if os.path.isdir(filename):
+                    filename += os.path.sep
+                new_lines.append(make_path_relative(filename, egg_info_dir))
+            f.close()
+            f = open(os.path.join(egg_info_dir, 'installed-files.txt'), 'w')
+            f.write('\n'.join(new_lines)+'\n')
+            f.close()
         finally:
-            logger.indent -= 2
-        self.install_succeeded = True
-        f = open(record_filename)
-        for line in f:
-            line = line.strip()
-            if line.endswith('.egg-info'):
-                egg_info_dir = line
-                break
-        else:
-            logger.warn('Could not find .egg-info directory in install record for %s' % self)
-            ## FIXME: put the record somewhere
-            return
-        f.close()
-        new_lines = []
-        f = open(record_filename)
-        for line in f:
-            filename = line.strip()
-            if os.path.isdir(filename):
-                filename += os.path.sep
-            new_lines.append(make_path_relative(filename, egg_info_dir))
-        f.close()
-        f = open(os.path.join(egg_info_dir, 'installed-files.txt'), 'w')
-        f.write('\n'.join(new_lines)+'\n')
-        f.close()
-        os.remove(record_filename)
-        os.rmdir(temp_location)
+            if os.path.exists(record_filename):
+                os.remove(record_filename)
+            os.rmdir(temp_location)
 
     def remove_temporary_source(self):
         """Remove the source files from this requirement, if they are marked
@@ -707,6 +721,7 @@ class RequirementSet(object):
         self.ignore_dependencies = ignore_dependencies
         self.successfully_downloaded = []
         self.successfully_installed = []
+        self.reqs_to_cleanup = []
 
     def __str__(self):
         reqs = [req for req in self.requirements.values()
@@ -760,7 +775,45 @@ class RequirementSet(object):
             req.uninstall(auto_confirm=auto_confirm)
             req.commit_uninstall()
 
-    def install_files(self, finder, force_root_egg_info=False, bundle=False):
+    def locate_files(self):
+        ## FIXME: duplicates code from install_files; relevant code should
+        ##        probably be factored out into a separate method
+        unnamed = list(self.unnamed_requirements)
+        reqs = self.requirements.values()
+        while reqs or unnamed:
+            if unnamed:
+                req_to_install = unnamed.pop(0)
+            else:
+                req_to_install = reqs.pop(0)
+            install_needed = True
+            if not self.ignore_installed and not req_to_install.editable:
+                req_to_install.check_if_exists()
+                if req_to_install.satisfied_by:
+                    if self.upgrade:
+                        req_to_install.conflicts_with = req_to_install.satisfied_by
+                        req_to_install.satisfied_by = None
+                    else:
+                        install_needed = False
+                if req_to_install.satisfied_by:
+                    logger.notify('Requirement already satisfied '
+                                  '(use --upgrade to upgrade): %s'
+                                  % req_to_install)
+
+            if req_to_install.editable:
+                if req_to_install.source_dir is None:
+                    req_to_install.source_dir = req_to_install.build_location(self.src_dir)
+            elif install_needed:
+                req_to_install.source_dir = req_to_install.build_location(self.build_dir, not self.is_download)
+
+            if req_to_install.source_dir is not None and not os.path.isdir(req_to_install.source_dir):
+                raise InstallationError('Could not install requirement %s '
+                                       'because source folder %s does not exist '
+                                       '(perhaps --no-download was used without first running '
+                                       'an equivalent install with --no-install?)'
+                                       % (req_to_install, req_to_install.source_dir))
+
+    def prepare_files(self, finder, force_root_egg_info=False, bundle=False):
+        """Prepare process. Create temp directories, download and/or unpack files."""
         unnamed = list(self.unnamed_requirements)
         reqs = self.requirements.values()
         while reqs or unnamed:
@@ -785,12 +838,12 @@ class RequirementSet(object):
                 logger.notify('Obtaining %s' % req_to_install)
             elif install:
                 if req_to_install.url and req_to_install.url.lower().startswith('file:'):
-                    logger.notify('Unpacking %s' % display_path(url_to_filename(req_to_install.url)))
+                    logger.notify('Unpacking %s' % display_path(url_to_path(req_to_install.url)))
                 else:
                     logger.notify('Downloading/unpacking %s' % req_to_install)
             logger.indent += 2
-            is_bundle = False
             try:
+                is_bundle = False
                 if req_to_install.editable:
                     if req_to_install.source_dir is None:
                         location = req_to_install.build_location(self.src_dir)
@@ -810,7 +863,7 @@ class RequirementSet(object):
                     ##editable in a req, a non deterministic error
                     ##occurs when the script attempts to unpack the
                     ##build directory
-                    
+
                     location = req_to_install.build_location(self.build_dir, not self.is_download)
                     ## FIXME: is the existance of the checkout good enough to use it?  I don't think so.
                     unpack = True
@@ -881,13 +934,34 @@ class RequirementSet(object):
                     if req_to_install.name not in self.requirements:
                         self.requirements[req_to_install.name] = req_to_install
                 else:
-                    req_to_install.remove_temporary_source()
+                    self.reqs_to_cleanup.append(req_to_install)
                 if install:
                     self.successfully_downloaded.append(req_to_install)
                     if bundle and (req_to_install.url and req_to_install.url.startswith('file:///')):
                         self.copy_to_builddir(req_to_install)
             finally:
                 logger.indent -= 2
+
+    def cleanup_files(self, bundle=False):
+        """Clean up files, remove builds."""
+        logger.notify('Cleaning up...')
+        logger.indent += 2
+        for req in self.reqs_to_cleanup:
+            req.remove_temporary_source()
+
+        # The build dir can always be removed.
+        remove_dir = [self.build_dir]
+
+        # The source dir of a bundle can always be removed.
+        if bundle:
+            remove_dir.append(self.src_dir)
+
+        for dir in remove_dir:
+            if os.path.exists(dir):
+                logger.info('Removing temporary dir %s...' % dir)
+                rmtree(dir)
+
+        logger.indent -= 2
 
     def copy_to_builddir(self, req_to_install):
         target_dir = req_to_install.editable and self.src_dir or self.build_dir
@@ -908,9 +982,8 @@ class RequirementSet(object):
                 else:
                     vcs_backend.unpack(location)
                 return
-        temp_dir = tempfile.mkdtemp()
         if link.url.lower().startswith('file:'):
-            source = url_to_filename(link.url)
+            source = url_to_path(link.url)
             content_type = mimetypes.guess_type(source)[0]
             if os.path.isdir(source):
                 # delete the location since shutil will create it again :(
@@ -920,6 +993,7 @@ class RequirementSet(object):
             else:
                 self.unpack_file(source, location, content_type, link)
             return
+        temp_dir = tempfile.mkdtemp('-unpack', 'pip-')
         md5_hash = link.md5_hash
         target_url = link.url.split('#', 1)[0]
         target_file = None
@@ -1229,14 +1303,6 @@ class RequirementSet(object):
 
         zip.writestr('pip-manifest.txt', self.bundle_requirements())
         zip.close()
-        # Unlike installation, this will always delete the build directories
-        logger.info('Removing temporary build dir %s and source dir %s'
-                    % (self.build_dir, self.src_dir))
-        for dir in self.build_dir, self.src_dir:
-            if os.path.exists(dir):
-                ## FIXME: should this use pip.util.rmtree?
-                shutil.rmtree(dir)
-
 
     BUNDLE_HEADER = '''\
 # This is a pip bundle file, that contains many source packages
@@ -1262,7 +1328,7 @@ class RequirementSet(object):
         return ''.join(parts)
 
     def _clean_zip_name(self, name, prefix):
-        assert name.startswith(prefix+'/'), (
+        assert name.startswith(prefix+os.path.sep), (
             "name %r doesn't start with prefix %r" % (name, prefix))
         name = name[len(prefix)+1:]
         name = name.replace(os.path.sep, '/')
@@ -1299,23 +1365,23 @@ def parse_requirements(filename, finder=None, comes_from=None, options=None):
             # No longer used, but previously these were used in
             # requirement files, so we'll ignore.
             pass
-        elif finder and line.startswith('-f') or line.startswith('--find-links'):
+        elif line.startswith('-f') or line.startswith('--find-links'):
             if line.startswith('-f'):
                 line = line[2:].strip()
             else:
                 line = line[len('--find-links'):].strip().lstrip('=')
             ## FIXME: it would be nice to keep track of the source of
             ## the find_links:
-            finder.find_links.append(line)
+            if finder: finder.find_links.append(line)
         elif line.startswith('-i') or line.startswith('--index-url'):
             if line.startswith('-i'):
                 line = line[2:].strip()
             else:
                 line = line[len('--index-url'):].strip().lstrip('=')
-            finder.index_urls = [line]
+            if finder: finder.index_urls = [line]
         elif line.startswith('--extra-index-url'):
             line = line[len('--extra-index-url'):].strip().lstrip('=')
-            finder.index_urls.append(line)
+            if finder: finder.index_urls.append(line)
         else:
             comes_from = '-r %s (line %s)' % (filename, line_number)
             if line.startswith('-e') or line.startswith('--editable'):
@@ -1335,7 +1401,7 @@ def parse_editable(editable_req, default_vcs=None):
     url = editable_req
     if os.path.isdir(url) and os.path.exists(os.path.join(url, 'setup.py')):
         # Treating it as code that has already been checked out
-        url = filename_to_url(url)
+        url = path_to_url(url)
     if url.lower().startswith('file:'):
         return None, url
     for version_control in vcs:
@@ -1389,7 +1455,7 @@ class UninstallPathSet(object):
 
         """
         return is_local(path)
-        
+
     def _can_uninstall(self):
         if not dist_is_local(self.dist):
             logger.notify("Not uninstalling %s at %s, outside environment %s"
@@ -1429,12 +1495,17 @@ class UninstallPathSet(object):
                 short_paths.add(path)
         return short_paths
 
+    def __stash(self, path):
+        return os.path.join(
+            self.save_dir, os.path.splitdrive(path)[1].lstrip(os.path.sep))
+
+
     def remove(self, auto_confirm=False):
         """Remove paths in ``self.paths`` with confirmation (unless
         ``auto_confirm`` is True)."""
         if not self._can_uninstall():
             return
-        logger.notify('Uninstalling %s!:' % self.dist.project_name)
+        logger.notify('Uninstalling %s:' % self.dist.project_name)
         logger.indent += 2
         paths = sorted(self.compact(self.paths))
         try:
@@ -1451,12 +1522,8 @@ class UninstallPathSet(object):
             if response == 'y':
                 self.save_dir = tempfile.mkdtemp(suffix='-uninstall',
                                                  prefix='pip-')
-                logger.notify('save_dir: %s'%self.save_dir)
                 for path in paths:
-                    new_path = os.path.splitdrive(path)[1].lstrip(os.path.sep)
-                    logger.notify('relative: %s'%new_path)
-                    new_path = os.path.join(self.save_dir, new_path)
-                    logger.notify('absolute: %s'%new_path)
+                    new_path = self.__stash(path)
                     logger.info('Removing file or directory %s' % path)
                     self._moved_paths.append(path)
                     if not os.path.exists(os.path.dirname(new_path)):
@@ -1476,7 +1543,7 @@ class UninstallPathSet(object):
             return False
         logger.notify('Rolling back uninstall of %s' % self.dist.project_name)
         for path in self._moved_paths:
-            tmp_path = os.path.join(self.save_dir, path.lstrip(os.path.sep))
+            tmp_path = self.__stash(path)
             logger.info('Replacing %s' % path)
             renames(tmp_path, path)
         for pth in self.pth:
@@ -1499,6 +1566,11 @@ class UninstallPthEntries(object):
         self._saved_lines = None
 
     def add(self, entry):
+        # On Windows, entries that describe absolute paths outside of
+        # site-packages are written with backslashes, but all the
+        # others use forward slashes.
+        if sys.platform == 'win32' and not os.path.splitdrive(entry)[0]:
+            entry = entry.replace('\\','/')
         self.entries.add(entry)
 
     def remove(self):
@@ -1516,7 +1588,7 @@ class UninstallPthEntries(object):
                 pass
         finally:
             pass
-        fh = open(self.file, 'w')
+        fh = open(self.file, 'wb')
         fh.writelines(lines)
         fh.close()
 
@@ -1525,7 +1597,7 @@ class UninstallPthEntries(object):
             logger.error('Cannot roll back changes to %s, none were made' % self.file)
             return False
         logger.info('Rolling %s back to previous state' % self.file)
-        fh = open(self.file, 'w')
+        fh = open(self.file, 'wb')
         fh.writelines(self._saved_lines)
         fh.close()
         return True

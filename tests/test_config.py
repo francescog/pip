@@ -76,3 +76,14 @@ def test_config_file_override_stack():
     assert "Getting page http://pypi.appspot.com/INITools" not in result.stdout
     assert "Getting page http://pypi.python.org/simple/INITools" in result.stdout
 
+def test_log_file_no_directory():
+    """
+    Test opening a log file with no directory name.
+    
+    """
+    from pip.basecommand import open_logfile
+    fp = open_logfile('testpip.log')
+    fp.write('can write')
+    fp.close()
+    assert os.path.exists(fp.name)
+    os.remove(fp.name)
