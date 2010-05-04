@@ -1,0 +1,9 @@
+#!/usr/bin/env python
+import pip, sys, pip.req, os
+import ryppl
+
+# Patch pip to do our bidding!
+pip.req.InstallRequirement._run_setup_py = (
+    ryppl._run_setup_py % os.path.join(os.path.dirname(ryppl.__file__), 'canonical_setup.py'))
+
+sys.exit(pip.main())

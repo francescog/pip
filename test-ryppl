@@ -1,0 +1,37 @@
+#!/bin/sh
+
+# Just so we don't inadvertently clobber our source
+cd /tmp
+
+### First get rid of all .pyc files.  Sometimes when debugging these
+### hang around because python is using them and then pdb runs
+### outdated code the next time around.
+
+## Find out where this script resides
+## (http://forums.macosxhints.com/archive/index.php/t-73839.html)
+
+## Linux
+LSOF=$(lsof -p $$ | grep -E "/"$(basename $0)"$")
+MY_PATH=$(echo $LSOF | sed -r s/'^([^\/]+)\/'/'\/'/1 2>/dev/null)
+if [ $? -ne 0 ]; then
+    ## OSX
+    MY_PATH=$(echo $LSOF | sed -E s/'^([^\/]+)\/'/'\/'/1 2>/dev/null)
+fi
+MY_ROOT=$(dirname $MY_PATH)
+
+rm `find "$MY_ROOT" -name '*.pyc'`
+rm -rf "$MY_ROOT"/build "$MY_ROOT"/dist "$MY_ROOT"/pip.egg-info
+
+rm -rf $HOME/.virtualenvs/clean
+virtualenv --no-site-packages --unzip-setuptools --distribute $HOME/.virtualenvs/clean
+export PATH=$HOME/.virtualenvs/clean/bin:"$PATH"
+export PYTHONPATH=/Users/dave/work/pipsync/int:/Users/dave/work/pipsync/int/scripttest
+export EDITOR=/Users/dave/bin/emacsx
+pip uninstall -y pip
+if [[ x"$1" == "x--pdb" ]]; then
+    shift
+    python -m pdb /Users/dave/work/pipsync/int/scripts/ryppl -vvv install -i http://dabrahams.github.com/ryppl-test-index boost-python
+else
+    /Users/dave/work/pipsync/int/scripts/ryppl -vvv install -i http://dabrahams.github.com/ryppl-test-index boost-python
+fi
+
