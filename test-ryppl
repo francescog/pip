@@ -25,13 +25,14 @@ rm -rf "$MY_ROOT"/build "$MY_ROOT"/dist "$MY_ROOT"/pip.egg-info
 rm -rf $HOME/.virtualenvs/clean
 virtualenv --no-site-packages --unzip-setuptools --distribute $HOME/.virtualenvs/clean
 export PATH=$HOME/.virtualenvs/clean/bin:"$PATH"
-export PYTHONPATH=/Users/dave/work/pipsync/int:/Users/dave/work/pipsync/int/scripttest
-export EDITOR=/Users/dave/bin/emacsx
+export PYTHONPATH=$MY_ROOT:$MY_ROOT/scripttest
+#export EDITOR=/Users/dave/bin/emacsx 
 pip uninstall -y pip
+source $HOME/.virtualenvs/clean/bin/activate
 if [[ x"$1" == "x--pdb" ]]; then
     shift
-    python -m pdb /Users/dave/work/pipsync/int/scripts/ryppl -vvv install -i http://dabrahams.github.com/ryppl-test-index boost-python
+    python -m pdb "$MY_ROOT"/scripts/ryppl -vvv install -i http://dabrahams.github.com/ryppl-test-index boost-python
 else
-    /Users/dave/work/pipsync/int/scripts/ryppl -vvv install -i http://dabrahams.github.com/ryppl-test-index boost-python
+    "$MY_ROOT"/scripts/ryppl -vvv install -i http://dabrahams.github.com/ryppl-test-index boost-python
 fi
 
