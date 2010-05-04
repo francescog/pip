@@ -8,3 +8,4 @@ test-scratch/
 log*.txt
 *.orig
 .gitignore
+PKG-INFO
